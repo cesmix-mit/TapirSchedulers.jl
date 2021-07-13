@@ -1,0 +1,12 @@
+name = "TapirSchedulersTests"
+uuid = "e1d0b974-9045-4267-96ef-7df8a1129a11"
+authors = ["Takafumi Arakaki <aka.tkf@gmail.com> and contributors"]
+version = "0.1.0"
+
+[deps]
+TapirSchedulers = "38de7e43-46ad-4ee9-b95c-91f351450dcb"
+TapirSchedulersBenchmarks = "7fec6468-e5d5-43bc-93c5-7a370b765647"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+julia = "1"
