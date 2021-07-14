@@ -17,5 +17,7 @@ end
     "Finished successfully",
     git_status = Text(git_status),
     git_show = Text(git_show),
-    time = Text(string(floor(Int, stats.time ÷ 60), " minutes"))
+    time = Text(string(floor(Int, stats.time ÷ 60), " minutes")),
+    VERSION,
+    Base.GIT_VERSION_INFO,
 )
