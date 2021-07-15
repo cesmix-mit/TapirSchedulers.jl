@@ -81,7 +81,7 @@ function trypush!(sch::WorkStealingScheduler, work::Work)
     )
 
     state = sch.state
-    if (@atomic :monotonic state.counter) < Threads.nthreads()
+    if (@atomic :monotonic state.counter) < Threads.nthreads() - 1
         for wkr in sch.workers
             if trywakeup!(wkr)
                 @atomic state.counter += 1
@@ -102,9 +102,6 @@ function workerloop!(sch::WorkStealingScheduler)
     schstate::SchedulerState = sch.state
     while true
         for _ in 1:nspins
-            while helpself!(sch)
-            end
-
             i = Threads.threadid() + 1
             for _ in 1:Threads.nthreads()-1
                 if i == Threads.threadid()
@@ -119,12 +116,12 @@ function workerloop!(sch::WorkStealingScheduler)
                         break
                     else
                         run!(something(item))
-                        while helpself!(sch)
-                        end
+                        GC.safepoint()
                     end
-                    GC.safepoint()
                 end
             end
+            GC.safepoint()
+            ccall(:jl_cpu_pause, Cvoid, ())
         end
 
         @trace(label = :worker_start_sleep, threadid = Threads.threadid())
@@ -192,7 +189,6 @@ function helpothers_until!(f, sch::WorkStealingScheduler)
                 run!(something(item))
                 @trace(label = :helpothers_success, threadid = Threads.threadid())
                 f() && return
-                helpself_until!(f, sch) && return
             end
         end
     end
@@ -206,6 +202,7 @@ function wait_nothrow(work::Work)
     end
     sch = scheduler(work)
     helpself_until!(isdone, sch) && return
+    # TODO: use yieldto to avoid stackoverflow
     helpothers_until!(isdone, sch)
     # Note: assuming `work` is in `sch`, `helpothers_until!` will finish
     # eventually.
