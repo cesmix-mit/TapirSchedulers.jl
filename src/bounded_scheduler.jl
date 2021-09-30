@@ -5,7 +5,7 @@ mutable struct Work
     @atomic isdone::Bool
     result::Any
     iserror::Bool
-    Work(@nospecialize(f)) = new(f, nothing, false, false, nothing, false)
+    Work(@nospecialize(f)) = new(f, nothing, true, false, nothing, false)
 end
 
 scheduler(work::Work) = work.scheduler::WorkStealingScheduler
@@ -69,11 +69,11 @@ function trypush!(sch::WorkStealingScheduler, work::Work)
     @assert work.scheduler === nothing
     work.scheduler = sch
     if !trypush!(sch.queues[Threads.threadid()], work)
+        work.isenqueued = false
         run!(work)
         @trace(label = :push_failed, threadid = Threads.threadid())
         return false
     end
-    work.isenqueued = true
     @trace(
         label = :push_success,
         threadid = Threads.threadid(),
