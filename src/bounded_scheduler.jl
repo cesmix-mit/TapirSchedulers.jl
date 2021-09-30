@@ -1,6 +1,8 @@
+abstract type Scheduler end
+
 mutable struct Work
     f::Any
-    scheduler::Any
+    scheduler::Union{Scheduler,Nothing}
     isenqueued::Bool
     @atomic isdone::Bool
     result::Any
@@ -8,7 +10,8 @@ mutable struct Work
     Work(@nospecialize(f)) = new(f, nothing, true, false, nothing, false)
 end
 
-scheduler(work::Work) = work.scheduler::WorkStealingScheduler
+# TODO: Better way to handle this.... parametric type?
+scheduler(work::Work) = work.scheduler::Union{WorkStealingScheduler,DepthFirstScheduler}
 
 function run!(work::Work)
     work.result = try
@@ -33,7 +36,7 @@ mutable struct SchedulerState
     @atomic counter::Int
 end
 
-struct WorkStealingScheduler
+struct WorkStealingScheduler <: Scheduler
     queues::Vector{BoundedWorkStealingDeque{Work}}
     workers::Vector{Worker}
     state::SchedulerState
@@ -79,7 +82,12 @@ function trypush!(sch::WorkStealingScheduler, work::Work)
         threadid = Threads.threadid(),
         length = length(sch.queues[Threads.threadid()]),
     )
+    trywakeupall!(sch)
 
+    return true
+end
+
+function trywakeupall!(sch)
     state = sch.state
     if (@atomic :monotonic state.counter) < Threads.nthreads() - 1
         for wkr in sch.workers
@@ -88,8 +96,6 @@ function trypush!(sch::WorkStealingScheduler, work::Work)
             end
         end
     end
-
-    return true
 end
 
 const WKR_WAITING = UInt(0)
@@ -220,13 +226,13 @@ function Base.fetch(work::Work)
     return work.result
 end
 
-function spawn!(sch::WorkStealingScheduler, @nospecialize(f))
+function spawn!(@nospecialize(f), sch::Scheduler)
     work = Work(f)
     trypush!(sch, work)
     return work
 end
 
-spawn(@nospecialize(f)) = spawn!(WORK_STEALING_SCHEDULER[], f)
+spawn(@nospecialize(f)) = spawn!f, (WORK_STEALING_SCHEDULER[])
 
 const WORK_STEALING_SCHEDULER = Ref{WorkStealingScheduler}()
 

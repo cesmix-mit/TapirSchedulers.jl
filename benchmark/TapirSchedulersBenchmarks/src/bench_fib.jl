@@ -67,6 +67,27 @@ end
 
 end  # module WSFib
 
+
+module DFFib
+
+using Base.Experimental: Tapir
+using TapirSchedulers
+
+function fib(N)
+    if N <= 1
+        return N
+    end
+    Tapir.@output a b
+    @sync_df begin
+        Tapir.@spawn a = fib(N - 2)
+        b = fib(N - 1)
+    end
+    return a + b
+end
+
+end  # module DFFib
+
+
 function setup(Ns = [5, 10, 20])
     suite = BenchmarkGroup()
     for N in Ns
@@ -75,6 +96,7 @@ function setup(Ns = [5, 10, 20])
         s0["base"] = @benchmarkable BaseFib.fib($N)
         s0["tapir"] = @benchmarkable TapirFib.fib($N)
         s0["ws"] = @benchmarkable WSFib.fib($N)
+        s0["df"] = @benchmarkable DFFib.fib($N)
     end
     return suite
 end

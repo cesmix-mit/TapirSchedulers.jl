@@ -10,3 +10,5 @@ macro trace(args...)
         nothing
     end
 end
+
+const var"@_assert" = var"@assert"

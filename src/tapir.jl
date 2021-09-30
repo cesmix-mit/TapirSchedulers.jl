@@ -59,7 +59,8 @@ function Tapir.sync!(tg::WorkStealingTaskGroup)
 end
 =#
 
-Tapir.spawn(::Type{WorkStealingTaskGroup}, @nospecialize(f)) = spawn(f)
+Tapir.spawn(::Type{WorkStealingTaskGroup}, @nospecialize(f)) =
+    spawn!(f, WORK_STEALING_SCHEDULER[])
 
 function Tapir.synctasks(args::ConcreteMaybe{Work}...)
     ex = nothing
@@ -82,4 +83,55 @@ end
 
 macro sync_ws(block)
     esc(:($Tapir.@sync $WorkStealingTaskGroup() $block))
+end
+
+"""
+    DepthFirstTaskGroup()
+
+A custom taskgroup implementation for `Base.Experimental.Tapir` using a relaxed
+depth-first scheduler.
+
+**NOTE**: Currently, it must used via `@sync_df`.
+"""
+DepthFirstTaskGroup
+
+function _DepthFirstTaskGroup end
+
+struct DepthFirstTaskGroup
+    global _DepthFirstTaskGroup() = new()
+end
+
+function DepthFirstTaskGroup()
+    invalidator()
+    return _DepthFirstTaskGroup()
+end
+
+# TODO: implement
+function Tapir.spawn!(tg::DepthFirstTaskGroup, @nospecialize(f))
+    error("Tapir.spawn!(::DepthFirstTaskGroup, _) not implemented yet")
+    push!(tg, spawn!(f, DEPTH_FIRST_SCHEDULER[]))
+end
+
+Tapir.spawn(::Type{DepthFirstTaskGroup}, @nospecialize(f)) =
+    spawn!(f, DEPTH_FIRST_SCHEDULER[])
+
+"""
+    @sync_df block
+
+Run Tapir tasks inside a `DepthFirstTaskGroup`.
+"""
+macro sync_df(block)
+    @gensym pr
+    if Meta.isexpr(block, :block)
+        block = Expr(:block, __source__, block)
+    end
+    quote
+        # TODO: make it possible to define this via Tapir entry points
+        $pr = $get_current_priority_range()
+        try
+            $Tapir.@sync $DepthFirstTaskGroup() $block
+        finally
+            $set_current_priority_range($pr)
+        end
+    end |> esc
 end

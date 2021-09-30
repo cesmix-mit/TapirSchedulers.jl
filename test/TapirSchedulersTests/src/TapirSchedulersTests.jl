@@ -4,6 +4,8 @@ using Test
 
 include("test_scheduler.jl")
 include("test_deque.jl")
+include("test_multi_queue.jl")
+include("test_depth_first.jl")
 
 if isdefined(Base.Experimental, :Tapir)
     include("test_tapir.jl")
