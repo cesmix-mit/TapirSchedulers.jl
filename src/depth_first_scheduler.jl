@@ -39,14 +39,23 @@ function workerloop!(sch::DepthFirstScheduler, wid::Integer)
     multiq = sch.multiq
     wkr = sch.workers[wid].state
     schstate = sch.state
+    npolls = 0
     while true
         while true
             item = maybepopmin!(multiq)
             if item === nothing
-                break
+                npolls += 1
+                if npolls < 1_000_000
+                    GC.safepoint()
+                    ccall(:jl_cpu_pause, Cvoid, ())
+                    # Main.@tlc loop_poll
+                else
+                    break
+                end
             else
                 run!(something(item::Some{Work}))
                 GC.safepoint()
+                npolls = 0
             end
         end
 
@@ -57,6 +66,7 @@ function workerloop!(sch::DepthFirstScheduler, wid::Integer)
         @assert (@atomic wkr.state) == WKR_NOTIFIED
         @atomic wkr.state = WKR_WORKING
         @trace(label = :worker_done_sleep, threadid = Threads.threadid())
+        # Main.@tlc loop_wakeup
     end
 end
 
@@ -122,20 +132,30 @@ helpself_until!(isdone, ::DepthFirstScheduler) = false
 function helpothers_until!(isdone, sch::DepthFirstScheduler)
     multiq = sch.multiq
     npolls = 0
+    backoff = 1
     while true
         isdone() && return
         item = maybepopmin!(multiq)
         if item === nothing
             # TODO: DON'T SPIN!!!!
-            npolls += 1
-            yield()
-            if npolls > 1_000_000
+            # yield()
+            nspins = rand(1:backoff)
+            npolls += nspins
+            for _ in 1:nspins
+                GC.safepoint()
+                ccall(:jl_cpu_pause, Cvoid, ())
+            end
+            backoff *= 2
+            backoff = min(backoff, 100_000)
+            # Main.@tlc helpothers_poll
+            if npolls > 1_000_000_000
                 error("timeout")
             end
         else
             npolls = 0
             run!(something(item::Some{Work}))
             GC.safepoint()
+            # Main.@tlc helpothers_helped
         end
     end
 end

@@ -16,7 +16,7 @@ function LockedPriorityQueue{K,V}(buffersize::Integer) where {K,V}
 end
 
 function MultiQueue{K,V}() where {K,V}
-    nqueues = 2 * Threads.nthreads()
+    nqueues = 4 * Threads.nthreads()
     queues = [LockedPriorityQueue{K,V}(128) for _ in 1:nqueues]
     return MultiQueue{K,V}(queues)
 end
@@ -43,13 +43,17 @@ end
 function trypush!(pq::LockedPriorityQueue{K,V}, x::Pair{K,V}) where {K,V}
     @_assert pq.locked
     @_assert first(x) < typemax(K)
-    length(pq.items) == pq.nitems && return false
+    if length(pq.items) == pq.nitems
+        # Main.@tlc lpq_full
+        return false
+    end
     i = searchsortedlast(view(pq.items, 1:pq.nitems), x; by = first, rev = true) + 1
     _insert!(pq.items, pq.nitems, i, x)
     pq.nitems += 1
     if i == 1
         @atomic :monotonic pq.minkey = first(x)
     end
+    # Main.@tlc lpq_inserted
     return true
 end
 
