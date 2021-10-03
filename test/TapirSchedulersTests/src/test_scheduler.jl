@@ -30,22 +30,24 @@ function fib(N, sch)
     return fetch(t)::Int + y
 end
 
-test_fib_work_stealing() = check_fib(WORK_STEALING_SCHEDULER[])
-
-function test_fib_depth_first()
+fib_ws(N) = fib(N, WORK_STEALING_SCHEDULER[])
+function fib_df(N)
     rollback_priority() do
-        check_fib(DEPTH_FIRST_SCHEDULER[])
+        fib(N, DEPTH_FIRST_SCHEDULER[])
     end
 end
 
-function check_fib(sch)
-    @test fib(1, sch) == 1
-    @test fib(2, sch) == 1
-    @test fib(3, sch) == 2
-    @test fib(4, sch) == 3
-    @test fib(5, sch) == 5
-    @test fib(6, sch) == 8
-    @test fib(10, sch) == 55
+test_fib_work_stealing() = check_fib(fib_ws)
+test_fib_depth_first() = check_fib(fib_df)
+
+function check_fib(fib)
+    @test fib(1) == 1
+    @test fib(2) == 1
+    @test fib(3) == 2
+    @test fib(4) == 3
+    @test fib(5) == 5
+    @test fib(6) == 8
+    @test fib(10) == 55
 end
 
 end  # module
