@@ -25,7 +25,7 @@ function DepthFirstScheduler()
             end
         end
         task = Task(workerloop)
-        @assert task.sticky == true
+        task.sticky == true
         ccall(:jl_set_task_tid, Cvoid, (Any, Cint), task, (wid - 1) % nworkers)
         push!(sch.workers, Worker(WorkerState(WKR_WORKING), task))
     end
@@ -146,7 +146,7 @@ function helpothers_until!(isdone, sch::DepthFirstScheduler)
                 ccall(:jl_cpu_pause, Cvoid, ())
             end
             backoff *= 2
-            backoff = min(backoff, 100_000)
+            backoff = min(backoff, 1000)
             # Main.@tlc helpothers_poll
             if npolls > 1_000_000_000
                 error("timeout")

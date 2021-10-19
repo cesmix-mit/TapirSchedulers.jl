@@ -16,12 +16,15 @@ function LockedPriorityQueue{K,V}(buffersize::Integer) where {K,V}
 end
 
 function MultiQueue{K,V}() where {K,V}
-    nqueues = 4 * Threads.nthreads()
+    nqueues = 2 * Threads.nthreads()
     queues = [LockedPriorityQueue{K,V}(128) for _ in 1:nqueues]
     return MultiQueue{K,V}(queues)
 end
 
 function Base.trylock(pq::LockedPriorityQueue)
+    if @atomic :monotonic pq.locked
+        return false
+    end
     _, ok = @atomicreplace pq.locked false => true
     return ok
 end
