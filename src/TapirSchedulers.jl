@@ -15,7 +15,8 @@ include("multi_queue.jl")
 include("depth_first_scheduler.jl")
 
 if isdefined(Base.Experimental, :Tapir)
-    export WorkStealingTaskGroup, DepthFirstTaskGroup, @sync_ws, @sync_df
+    export WorkStealingTaskGroup,
+        DepthFirstTaskGroup, NonDepthFirstTaskGroup, @sync_ws, @sync_df, @sync_ndf
     using Base.Experimental: Tapir
     include("tapir.jl")
 end

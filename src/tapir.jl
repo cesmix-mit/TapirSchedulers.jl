@@ -135,3 +135,52 @@ macro sync_df(block)
         end
     end |> esc
 end
+
+"""
+    NonDepthFirstTaskGroup()
+
+Almost equivalent to `DepthFirstTaskGroup` but the priority assignment is
+disabled.
+"""
+NonDepthFirstTaskGroup
+
+function _NonDepthFirstTaskGroup end
+
+struct NonDepthFirstTaskGroup
+    global _NonDepthFirstTaskGroup() = new()
+end
+
+function NonDepthFirstTaskGroup()
+    invalidator()
+    return _NonDepthFirstTaskGroup()
+end
+
+# TODO: implement
+function Tapir.spawn!(tg::NonDepthFirstTaskGroup, @nospecialize(f))
+    error("Tapir.spawn!(::NonDepthFirstTaskGroup, _) not implemented yet")
+    push!(tg, spawn!(f, NON_DEPTH_FIRST_SCHEDULER[]))
+end
+
+Tapir.spawn(::Type{NonDepthFirstTaskGroup}, @nospecialize(f)) =
+    spawn!(f, NON_DEPTH_FIRST_SCHEDULER[])
+
+"""
+    @sync_ndf block
+
+Run Tapir tasks inside a `NonDepthFirstTaskGroup`.
+"""
+macro sync_ndf(block)
+    @gensym pr
+    if Meta.isexpr(block, :block)
+        block = Expr(:block, __source__, block)
+    end
+    quote
+        # TODO: make it possible to define this via Tapir entry points
+        $pr = $get_current_priority_range()
+        try
+            $Tapir.@sync $NonDepthFirstTaskGroup() $block
+        finally
+            $set_current_priority_range($pr)
+        end
+    end |> esc
+end

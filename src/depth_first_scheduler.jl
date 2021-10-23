@@ -5,15 +5,17 @@ struct DepthFirstScheduler <: Scheduler
     multiq::MultiQueue{Priority,Work}
     workers::Vector{Worker}
     state::SchedulerState
+    use_priority::Bool
 end
 
-function DepthFirstScheduler()
+function DepthFirstScheduler(; use_priority::Bool = true)
     # TODO: Support and test "oversubscription"; useful for waitable tasks.
     nworkers = Threads.nthreads()
     sch = DepthFirstScheduler(
         MultiQueue{Priority,Work}(),
         Worker[],  # to be filled
         SchedulerState(nworkers),
+        use_priority,
     )
     for wid in 1:nworkers
         function workerloop()
@@ -110,6 +112,19 @@ end
 function spawn!(f::F, sch::DepthFirstScheduler) where {F}
     pr = get_current_priority_range()
     low, high = halverange(pr)
+    lb, ub = entirerange(PriorityRange)
+    rnd1 = rand(lb:ub)
+    rnd2 = rand(lb:ub)
+    if !sch.use_priority
+        low = rnd1 => rnd1
+        high = rnd2 => rnd2
+    end
+    # Not setting priority is actually fine?
+    #=
+    if !sch.use_priority
+        low = high = pr
+    end
+    =#
     set_current_priority_range(low)  # more urgent
     subrange = high::PriorityRange   # less urgent
 
@@ -161,14 +176,18 @@ function helpothers_until!(isdone, sch::DepthFirstScheduler)
 end
 
 const DEPTH_FIRST_SCHEDULER = Ref{DepthFirstScheduler}()
+const NON_DEPTH_FIRST_SCHEDULER = Ref{DepthFirstScheduler}()
 
 function init_depth_first_scheduler()
     DEPTH_FIRST_SCHEDULER[] = DepthFirstScheduler()
+    NON_DEPTH_FIRST_SCHEDULER[] = DepthFirstScheduler(; use_priority = false)
 end
 
 function Base.show(io::IO, sch::DepthFirstScheduler)
     if sch === DEPTH_FIRST_SCHEDULER[]
         print(io, TapirSchedulers, '.', "DEPTH_FIRST_SCHEDULER[]")
+    elseif sch === NON_DEPTH_FIRST_SCHEDULER[]
+        print(io, TapirSchedulers, '.', "NON_DEPTH_FIRST_SCHEDULER[]")
     else
         print(io, DepthFirstScheduler, "()")
     end
