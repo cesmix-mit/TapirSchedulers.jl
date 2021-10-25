@@ -137,39 +137,38 @@ macro sync_df(block)
 end
 
 """
-    NonDepthFirstTaskGroup()
+    ConstantPriorityTaskGroup()
 
-Almost equivalent to `DepthFirstTaskGroup` but the priority assignment is
-disabled.
+Almost equivalent to `DepthFirstTaskGroup` but the priority is constant.
 """
-NonDepthFirstTaskGroup
+ConstantPriorityTaskGroup
 
-function _NonDepthFirstTaskGroup end
+function _ConstantPriorityTaskGroup end
 
-struct NonDepthFirstTaskGroup
-    global _NonDepthFirstTaskGroup() = new()
+struct ConstantPriorityTaskGroup
+    global _ConstantPriorityTaskGroup() = new()
 end
 
-function NonDepthFirstTaskGroup()
+function ConstantPriorityTaskGroup()
     invalidator()
-    return _NonDepthFirstTaskGroup()
+    return _ConstantPriorityTaskGroup()
 end
 
 # TODO: implement
-function Tapir.spawn!(tg::NonDepthFirstTaskGroup, @nospecialize(f))
-    error("Tapir.spawn!(::NonDepthFirstTaskGroup, _) not implemented yet")
-    push!(tg, spawn!(f, NON_DEPTH_FIRST_SCHEDULER[]))
+function Tapir.spawn!(tg::ConstantPriorityTaskGroup, @nospecialize(f))
+    error("Tapir.spawn!(::ConstantPriorityTaskGroup, _) not implemented yet")
+    push!(tg, spawn!(f, CONSTANT_PRIORITY_SCHEDULER[]))
 end
 
-Tapir.spawn(::Type{NonDepthFirstTaskGroup}, @nospecialize(f)) =
-    spawn!(f, NON_DEPTH_FIRST_SCHEDULER[])
+Tapir.spawn(::Type{ConstantPriorityTaskGroup}, @nospecialize(f)) =
+    spawn!(f, CONSTANT_PRIORITY_SCHEDULER[])
 
 """
-    @sync_ndf block
+    @sync_cp block
 
-Run Tapir tasks inside a `NonDepthFirstTaskGroup`.
+Run Tapir tasks inside a `ConstantPriorityTaskGroup`.
 """
-macro sync_ndf(block)
+macro sync_cp(block)
     @gensym pr
     if Meta.isexpr(block, :block)
         block = Expr(:block, __source__, block)
@@ -178,7 +177,55 @@ macro sync_ndf(block)
         # TODO: make it possible to define this via Tapir entry points
         $pr = $get_current_priority_range()
         try
-            $Tapir.@sync $NonDepthFirstTaskGroup() $block
+            $Tapir.@sync $ConstantPriorityTaskGroup() $block
+        finally
+            $set_current_priority_range($pr)
+        end
+    end |> esc
+end
+
+"""
+    RandomPriorityTaskGroup()
+
+Almost equivalent to `DepthFirstTaskGroup` but the priority is randomized.
+"""
+RandomPriorityTaskGroup
+
+function _RandomPriorityTaskGroup end
+
+struct RandomPriorityTaskGroup
+    global _RandomPriorityTaskGroup() = new()
+end
+
+function RandomPriorityTaskGroup()
+    invalidator()
+    return _RandomPriorityTaskGroup()
+end
+
+# TODO: implement
+function Tapir.spawn!(tg::RandomPriorityTaskGroup, @nospecialize(f))
+    error("Tapir.spawn!(::RandomPriorityTaskGroup, _) not implemented yet")
+    push!(tg, spawn!(f, RANDOM_PRIORITY_SCHEDULER[]))
+end
+
+Tapir.spawn(::Type{RandomPriorityTaskGroup}, @nospecialize(f)) =
+    spawn!(f, RANDOM_PRIORITY_SCHEDULER[])
+
+"""
+    @sync_rp block
+
+Run Tapir tasks inside a `RandomPriorityTaskGroup`.
+"""
+macro sync_rp(block)
+    @gensym pr
+    if Meta.isexpr(block, :block)
+        block = Expr(:block, __source__, block)
+    end
+    quote
+        # TODO: make it possible to define this via Tapir entry points
+        $pr = $get_current_priority_range()
+        try
+            $Tapir.@sync $RandomPriorityTaskGroup() $block
         finally
             $set_current_priority_range($pr)
         end

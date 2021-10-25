@@ -2,7 +2,7 @@ module TestTapir
 
 using Base.Experimental: Tapir
 using TapirSchedulers
-using TapirSchedulersBenchmarks.BenchFib: WSFib, DFFib
+using TapirSchedulersBenchmarks.BenchFib: WSFib, DFFib, CPFib, RPFib
 using Test
 
 @noinline produce(x) = Base.inferencebarrier(x)::typeof(x)
@@ -36,6 +36,8 @@ end
 
 test_fib_work_stealing() = check_fib(WSFib.fib)
 test_fib_depth_first() = check_fib(DFFib.fib)
+test_fib_constant_priority() = check_fib(CPFib.fib)
+test_fib_random_priority() = check_fib(RPFib.fib)
 
 function check_fib(fib)
     @test fib(1) == 1

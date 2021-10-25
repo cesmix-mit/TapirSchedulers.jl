@@ -1,21 +1,27 @@
 # TODO: maybe try 16 bit?
 const Priority = UInt64
 
+@enum PriorityType::UInt8 begin
+    DEPTH_FIRST_PRIORITY
+    CONSTANT_PRIORITY
+    RANDOM_PRIORITY
+end
+
 struct DepthFirstScheduler <: Scheduler
     multiq::MultiQueue{Priority,Work}
     workers::Vector{Worker}
     state::SchedulerState
-    use_priority::Bool
+    priority_type::PriorityType
 end
 
-function DepthFirstScheduler(; use_priority::Bool = true)
+function DepthFirstScheduler(; priority_type::PriorityType = DEPTH_FIRST_PRIORITY)
     # TODO: Support and test "oversubscription"; useful for waitable tasks.
     nworkers = Threads.nthreads()
     sch = DepthFirstScheduler(
         MultiQueue{Priority,Work}(),
         Worker[],  # to be filled
         SchedulerState(nworkers),
-        use_priority,
+        priority_type,
     )
     for wid in 1:nworkers
         function workerloop()
@@ -115,16 +121,12 @@ function spawn!(f::F, sch::DepthFirstScheduler) where {F}
     lb, ub = entirerange(PriorityRange)
     rnd1 = rand(lb:ub)
     rnd2 = rand(lb:ub)
-    if !sch.use_priority
+    if sch.priority_type == CONSTANT_PRIORITY
+        low = high = pr
+    elseif sch.priority_type == RANDOM_PRIORITY
         low = rnd1 => rnd1
         high = rnd2 => rnd2
     end
-    # Not setting priority is actually fine?
-    #=
-    if !sch.use_priority
-        low = high = pr
-    end
-    =#
     set_current_priority_range(low)  # more urgent
     subrange = high::PriorityRange   # less urgent
 
@@ -176,18 +178,22 @@ function helpothers_until!(isdone, sch::DepthFirstScheduler)
 end
 
 const DEPTH_FIRST_SCHEDULER = Ref{DepthFirstScheduler}()
-const NON_DEPTH_FIRST_SCHEDULER = Ref{DepthFirstScheduler}()
+const CONSTANT_PRIORITY_SCHEDULER = Ref{DepthFirstScheduler}()
+const RANDOM_PRIORITY_SCHEDULER = Ref{DepthFirstScheduler}()
 
 function init_depth_first_scheduler()
     DEPTH_FIRST_SCHEDULER[] = DepthFirstScheduler()
-    NON_DEPTH_FIRST_SCHEDULER[] = DepthFirstScheduler(; use_priority = false)
+    CONSTANT_PRIORITY_SCHEDULER[] = DepthFirstScheduler(; priority_type = CONSTANT_PRIORITY)
+    RANDOM_PRIORITY_SCHEDULER[] = DepthFirstScheduler(; priority_type = RANDOM_PRIORITY)
 end
 
 function Base.show(io::IO, sch::DepthFirstScheduler)
     if sch === DEPTH_FIRST_SCHEDULER[]
         print(io, TapirSchedulers, '.', "DEPTH_FIRST_SCHEDULER[]")
-    elseif sch === NON_DEPTH_FIRST_SCHEDULER[]
-        print(io, TapirSchedulers, '.', "NON_DEPTH_FIRST_SCHEDULER[]")
+    elseif sch === CONSTANT_PRIORITY_SCHEDULER[]
+        print(io, TapirSchedulers, '.', "CONSTANT_PRIORITY_SCHEDULER[]")
+    elseif sch === RANDOM_PRIORITY_SCHEDULER[]
+        print(io, TapirSchedulers, '.', "RANDOM_PRIORITY_SCHEDULER[]")
     else
         print(io, DepthFirstScheduler, "()")
     end
